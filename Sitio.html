@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="es">
+ 
+
+<head>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Interfaz: Cámara + Traducción + Voz</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="color-scheme" content="light dark" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #0D0D0D; --card:#3F094F; --muted:#F2F2F2; --accent1:#D923DB; --accent2:#80277B; }
+    html { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+    .message-box { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 1rem; padding: 1rem; margin-top: 0.5rem; font-size: 2rem; text-align: center; font-weight: bold; }
+    .subtitle-box { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 0.5rem; padding: 0.5rem 1rem; margin-top: 0.5rem; font-size: 1.25rem; text-align: center; font-weight: bold; color: #F2F2F2; }
+  </style>
+  <header class="bg-[var(--card)] shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-5 flex justify-between items-center">
+      <h1 class="text-2xl font-extrabold">✋ Aprende Lengua de Señas</h1>
+      <nav>
+        <a href="Interfaz_principal.html" class="px-4 py-2 rounded-lg bg-[var(--accent1)] hover:bg-[var(--accent2)] font-semibold text-white">Inicio</a>
+      </nav>
+    </div>
+  </header>
+
+</head>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+<body class="min-h-screen bg-[var(--bg)] text-[var(--muted)]">
+  <header class="max-w-6xl mx-auto px-4 py-6 flex items-center justify-between">
+    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Cámara + Traducción + Voz</h1>
+    <div class="text-xs sm:text-sm text-[var(--muted)]">Demo HTML/JS (sin backend)</div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 pb-20">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- CAMARA -->
+      <section class="bg-[var(--card)]/60 rounded-2xl p-4 sm:p-6 shadow-xl ring-1 ring-white/5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">Cámara</h2>
+          <span class="text-xs text-[var(--muted)]" id="camStatus">inactiva</span>
+        </div>
+
+        <div class="space-y-4">
+          <div class="aspect-video w-full overflow-hidden rounded-xl ring-1 ring-white/10">
+            <video id="video" class="w-full h-full object-cover bg-slate-800" playsinline></video>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button id="btnStartCam" class="px-3 py-2 rounded-xl bg-[var(--accent1)] hover:bg-[var(--accent2)] transition font-medium">Iniciar</button>
+            <button id="btnStopCam" class="px-3 py-2 rounded-xl bg-[var(--card)] hover:bg-[#5a0b5a] transition font-medium">Detener</button>
+            <button id="btnTranslateText" class="px-3 py-2 rounded-xl bg-[var(--accent2)] hover:bg-[var(--accent1)] transition font-medium">Traducir a Texto</button>
+            <button id="btnTranslateVoice" class="px-3 py-2 rounded-xl bg-[var(--accent2)] hover:bg-[var(--accent1)] transition font-medium">Traducir a Voz</button>
+          </div>
+<canvas id="canvas" width="640" height="480" 
+        class="w-full rounded-xl ring-1 ring-white/10"></canvas>
+
+          
+          <figure id="previewWrap" class="hidden">
+            <figcaption class="text-sm text-[var(--muted)] mb-2">Captura</figcaption>
+            <img id="preview" alt="Captura" class="rounded-xl ring-1 ring-white/10 max-h-72 object-contain" />
+            <div class="mt-2 flex gap-2">
+              <a id="downloadShot" download="captura.png" class="text-sm underline decoration-[#80277B] hover:decoration-[#D923DB]">Descargar</a>
+              <button id="clearShot" class="text-sm text-[var(--muted)] hover:text-white">Limpiar</button>
+            </div>
+          </figure>
+          <p class="text-xs text-[var(--muted)]">Permisos: tu navegador pedirá acceso a la cámara. Usa HTTPS o localhost para evitar bloqueos.</p>
+
+          <!-- Contenedor de subtítulos -->
+          <div id="subtitles" class="subtitle-box">Aquí aparecerán los subtítulos de las señas</div>
+        </div>
+      </section>
+
+      <!-- ENVIAR TEXTO -->
+      <section class="bg-[var(--card)]/60 rounded-2xl p-4 sm:p-6 shadow-xl ring-1 ring-white/5">
+        <div class="space-y-6">
+          <h3 class="font-semibold mb-2">Enviar texto</h3>
+          <div class="flex gap-2">
+            <input id="sendInput" type="text" class="flex-1 bg-[#0D0D0D] rounded-xl p-3 ring-1 ring-white/10" placeholder="Escribe un mensaje…" />
+            <button id="btnSend" class="px-4 py-2 rounded-xl bg-[var(--accent1)] hover:bg-[var(--accent2)] transition font-semibold">Enviar</button>
+          </div>
+          <div id="messageContainer"></div>
+          <!-- Imagen de ejemplo -->
+          <div class="mt-4">
+            <img src="c:\Users\MINEDUCYT\Downloads\WhatsApp Image 2025-08-30 at 9.38.03 AM (1).jpeg" alt="Ejemplo" class="w-full rounded-xl shadow-lg" />
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="max-w-6xl mx-auto px-4 pb-10 text-center text-xs text-[var(--muted)]">
+    Hecho  por el equipo de SingToSpeech.
+  </footer>
+ 
+<script>
+// ====== SELECTORES EXISTENTES ======
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const subtitles = document.getElementById('subtitles');
+const camStatus = document.getElementById('camStatus');
+
+const video = document.getElementById('video');
+const btnStartCam = document.getElementById('btnStartCam');
+const btnStopCam  = document.getElementById('btnStopCam');
+const btnTranslateText  = document.getElementById('btnTranslateText');   // reusado: Añadir ejemplo (letra)
+const btnTranslateVoice = document.getElementById('btnTranslateVoice');  // reusado: Auto ON/OFF
+
+// ====== BOTONES AUX (ESPACIO / BORRAR) -> se crean si no existen ======
+(function ensureAuxButtons(){
+  const grid = document.querySelector('.grid.grid-cols-2.sm\\:grid-cols-4.gap-2');
+  if (!grid) return;
+  if (!document.getElementById('btnSpace')) {
+    const b = document.createElement('button');
+    b.id='btnSpace';
+    b.className='px-3 py-2 rounded-xl bg-[var(--card)] hover:bg-[#5a0b5a] transition font-medium';
+    b.textContent='Espacio';
+    grid.appendChild(b);
+  }
+  if (!document.getElementById('btnBack')) {
+    const b = document.createElement('button');
+    b.id='btnBack';
+    b.className='px-3 py-2 rounded-xl bg-[var(--card)] hover:bg-[#5a0b5a] transition font-medium';
+    b.textContent='Borrar';
+    grid.appendChild(b);
+  }
+})();
+
+const btnSpace = document.getElementById('btnSpace');
+const btnBack  = document.getElementById('btnBack');
+
+// ====== MEDIAPIPE HANDS ======
+const hands = new Hands({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+hands.setOptions({
+  maxNumHands: 1,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7
+});
+
+// ====== DATASET (KNN) PARA LETRAS LESA ======
+/** dataset = { "A":[Float32Array,...], "B":[...], ... } */
+const dataset = Object.create(null);
+
+// Persistencia
+function saveDataset(){
+  const packed = {};
+  for (const [k, arr] of Object.entries(dataset)) packed[k] = arr.map(v => Array.from(v));
+  try { localStorage.setItem('lessa-dataset', JSON.stringify(packed)); } catch {}
+}
+function loadDataset(){
+  try {
+    const raw = localStorage.getItem('lessa-dataset'); if (!raw) return;
+    const packed = JSON.parse(raw);
+    for (const [k, arr] of Object.entries(packed)) dataset[k] = arr.map(a => Float32Array.from(a));
+  } catch {}
+}
+loadDataset();
+
+// ====== FEATURES + KNN ======
+function extractFeatures(landmarks){
+  // Normaliza a la muñeca como origen y escala por distancia máxima a la muñeca.
+  const o = landmarks[0];
+  const pts = landmarks.map(p => ({x:p.x-o.x, y:p.y-o.y, z:(p.z||0)-(o.z||0)}));
+  let maxd = 0;
+  for (let i=1;i<pts.length;i++){
+    const d = Math.hypot(pts[i].x, pts[i].y, pts[i].z);
+    if (d>maxd) maxd=d;
+  }
+  const s = maxd || 1e-6;
+  const f = new Float32Array(pts.length*3);
+  for (let i=0;i<pts.length;i++){
+    f[i*3+0]=pts[i].x/s; f[i*3+1]=pts[i].y/s; f[i*3+2]=pts[i].z/s;
+  }
+  return f;
+}
+function l2(a,b){ let s=0; for (let i=0;i<a.length;i++){ const d=a[i]-b[i]; s+=d*d; } return Math.sqrt(s); }
+function predictKNN(feat, k=3){
+  const neigh=[];
+  for (const [lab, arr] of Object.entries(dataset)){
+    for (const v of arr) neigh.push({ lab, d: l2(feat, v) });
+  }
+  if (!neigh.length) return { label:null, conf:0 };
+  neigh.sort((a,b)=>a.d-b.d);
+  const top = neigh.slice(0, Math.min(k, neigh.length));
+  const votes={}; let sum=0, bestLab=null, bestScore=-1;
+  for (const n of top){
+    const w = 1/(n.d+1e-6);
+    votes[n.lab]=(votes[n.lab]||0)+w; sum+=w;
+    if (votes[n.lab]>bestScore){ bestScore=votes[n.lab]; bestLab=n.lab; }
+  }
+  return { label: bestLab, conf: bestScore/(sum||1) };
+}
+
+// ====== REGLAS RÁPIDAS PARA SEÑAS (sin entrenar) ======
+function dist(a,b){ const dx=a.x-b.x, dy=a.y-b.y, dz=(a.z||0)-(b.z||0); return Math.hypot(dx,dy,dz); }
+function isExtended(lm, tip, pip){ return lm[tip].y < lm[pip].y; }
+function isCurled(lm, tip, pip){ return lm[tip].y > lm[pip].y; }
+function thumbExtended(lm, handed='Right'){
+  const right = (handed==='Right');
+  const tip = lm[4].x, ip = lm[3].x;
+  return right ? (tip > ip + 0.02) : (tip < ip - 0.02);
+}
+function near(a,b,rel){ return (dist(a,b)/rel) < 0.5; } // útil para OK
+
+function classifyRuleBased(lm, handed='Right'){
+  const ext = {
+    i: isExtended(lm,8,6),
+    m: isExtended(lm,12,10),
+    r: isExtended(lm,16,14),
+    p: isExtended(lm,20,18),
+  };
+  const cur = {
+    i: isCurled(lm,8,6),
+    m: isCurled(lm,12,10),
+    r: isCurled(lm,16,14),
+    p: isCurled(lm,20,18),
+  };
+  const tExt = thumbExtended(lm, handed);
+  const scale = dist(lm[0], lm[5]) + 1e-6;
+
+  // A (puño): todos curvados, pulgar no muy extendido
+  if (cur.i && cur.m && cur.r && cur.p && !tExt) return {label:'A', conf:0.95};
+
+  // B (mano abierta): cuatro dedos extendidos (pulgar libre)
+  if (ext.i && ext.m && ext.r && ext.p) return {label:'B', conf:0.9};
+
+  // L: índice + pulgar extendidos; medio/anular/meñique curvados
+  if (ext.i && tExt && cur.m && cur.r && cur.p) return {label:'L', conf:0.9};
+
+  // Y: pulgar + meñique extendidos; índice/medio/anular curvados
+  if (tExt && ext.p && cur.i && cur.m && cur.r) return {label:'Y', conf:0.9};
+
+  // F (OK): pulgar-índice tocándose
+  if (near(lm[4], lm[8], scale)) return {label:'F', conf:0.9}; // también útil como "OK"
+
+  // D: índice extendido, resto curvos, pulgar no extendido
+  if (ext.i && cur.m && cur.r && cur.p && !tExt) return {label:'D', conf:0.85};
+
+  // G: índice + pulgar extendidos en horizontal, resto curvos (similar a L pero más "alineados" en y)
+  if (ext.i && tExt && cur.m && cur.r && cur.p && Math.abs(lm[4].y - lm[8].y) < 0.05) return {label:'G', conf:0.85};
+
+  // THUMBS_UP: pulgar arriba, resto curvos
+  if (tExt && cur.i && cur.m && cur.r && cur.p && lm[4].y < lm[2].y) return {label:'THUMBS_UP', conf:0.9};
+
+  // PEACE: índice + medio extendidos, anular + meñique curvos
+  if (ext.i && ext.m && cur.r && cur.p) return {label:'PEACE', conf:0.9};
+
+  // ILY: pulgar + índice + meñique extendidos; medio + anular curvos
+  if (tExt && ext.i && ext.p && cur.m && cur.r) return {label:'ILY', conf:0.9};
+
+  return {label:null, conf:0};
+}
+
+// Traducción para señas por reglas (palabras)
+const SIGN_TRANSLATE = {
+  'THUMBS_UP':'¡Bien!',
+  'PEACE':'Paz',
+  'ILY':'Te quiero',
+  'F':'OK'
+};
+
+// ====== SUAVIZADO Y CONTROL ======
+const WIN=10, NEED=7, CONF_MIN=0.68;   // agresivo = responde más rápido
+let predWin=[];                        // [{label, conf, type:'rule'|'knn'}]
+let autoOn=false;                      // Reconocimiento automático (toggle)
+let textBuffer='';                     // acumulador (letras/palabras)
+
+// ====== VOZ LENTA ======
+const synth = window.speechSynthesis;
+let lastSpoken='', lastAt=0;
+const COOLDOWN=1200;
+function speakSlow(text){
+  const now = performance.now();
+  if (text===lastSpoken && (now-lastAt)<COOLDOWN) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'es-ES';
+  u.rate = 0.75;   // MÁS LENTO
+  u.pitch = 1.0;
+  synth.speak(u);
+  lastSpoken=text; lastAt=now;
+}
+
+// ====== PIPELINE DE RESULTADOS ======
+let lastLandmarks=null, lastHanded='Right';
+
+hands.onResults((results)=>{
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  ctx.save();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(results.image, 0,0, canvas.width, canvas.height);
+
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length){
+    const lm = results.multiHandLandmarks[0];
+    lastLandmarks = lm;
+    if (results.multiHandedness && results.multiHandedness[0]?.label) {
+      lastHanded = results.multiHandedness[0].label;
+    }
+
+    // Dibujo
+    drawConnectors(ctx, lm, HAND_CONNECTIONS, {color:"#D923DB", lineWidth:3});
+    drawLandmarks(ctx, lm, {color:"#00FF00", lineWidth:2});
+
+    if (autoOn){
+      // 1) Señal rápida por reglas (palabras/letras sin entrenar)
+      const rule = classifyRuleBased(lm, lastHanded);
+      if (rule.label) predWin.push({label:rule.label, conf:rule.conf, type:'rule'});
+
+      // 2) Letras por KNN (si hay dataset)
+      if (Object.keys(dataset).length){
+        const feat = extractFeatures(lm);
+        const knn = predictKNN(feat, 3);
+        if (knn.label) predWin.push({label:knn.label, conf:knn.conf, type:'knn'});
+      }
+
+      if (predWin.length>WIN) predWin.shift();
+
+      // Votar estable (prioriza reglas si empatan)
+      const tally={};
+      for (const p of predWin){
+        if (!p.label || p.conf<CONF_MIN) continue;
+        const key = p.label + '|' + p.type;
+        tally[key]=(tally[key]||0)+1;
+      }
+      let bestKey=null, bestCnt=0;
+      for (const [k,n] of Object.entries(tally)){ if (n>bestCnt){ bestCnt=n; bestKey=k; } }
+      let stable=null, source='knn';
+      if (bestKey && bestCnt>=NEED){
+        const [lab,t] = bestKey.split('|');
+        stable = lab; source = t;
+      }
+
+      if (stable){
+        // Si viene de reglas y existe traducción a palabra, úsala; si no, usa etiqueta.
+        const out = (source==='rule' ? (SIGN_TRANSLATE[stable] || stable) : stable);
+
+        // Acumular en buffer: si es “palabra”, añade con espacio; si es letra, concatena.
+        if (source==='rule' && SIGN_TRANSLATE[stable]){
+          if (textBuffer && !textBuffer.endsWith(' ')) textBuffer+=' ';
+          textBuffer += SIGN_TRANSLATE[stable] + ' ';
+        } else {
+          textBuffer += out;
+        }
+
+        subtitles.textContent = `🧠 ${textBuffer}`;
+        speakSlow(out);
+        predWin.length = 0; // evita spam
+      } else {
+        // feedback en vivo
+        if (rule.label) subtitles.textContent = `Seña: ${rule.label} ${(rule.conf*100|0)}%`;
+        else subtitles.textContent = '👋 Mano detectada';
+      }
+    } else {
+      subtitles.textContent = '👋 Mano detectada';
+    }
+
+    camStatus.textContent = "activa";
+  } else {
+    lastLandmarks=null;
+    predWin.length=0;
+    subtitles.textContent = "❌ No se detecta mano";
+    camStatus.textContent = "inactiva";
+  }
+  ctx.restore();
+});
+
+// ====== CÁMARA ======
+let cameraMediapipe=null;
+btnStartCam.addEventListener("click", ()=>{
+  cameraMediapipe = new Camera(video, {
+    onFrame: async ()=>{ await hands.send({ image: video }); },
+    width: 640, height: 480
+  });
+  cameraMediapipe.start();
+});
+btnStopCam.addEventListener("click", ()=>{
+  if (cameraMediapipe) cameraMediapipe.stop();
+  video.srcObject=null;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  subtitles.textContent="⏹️ Cámara detenida";
+  camStatus.textContent="inactiva";
+});
+
+// ====== ENTRENAR LETRAS (REUTILIZA "Traducir a Texto") ======
+btnTranslateText.addEventListener('click', ()=>{
+  if (!lastLandmarks){ alert('No hay mano detectada'); return; }
+  const labRaw = prompt('Letra (A–Z o Ñ).', 'A');
+  if (!labRaw) return;
+  const label = labRaw.trim().toUpperCase();
+  if (!label) return;
+
+  const feat = extractFeatures(lastLandmarks);
+  dataset[label] = dataset[label] || [];
+  dataset[label].push(feat);
+  saveDataset();
+
+  let total=0; for (const a of Object.values(dataset)) total += a.length;
+  subtitles.textContent = `➕ Ejemplo "${label}" guardado · ${Object.keys(dataset).length} letras, ${total} muestras`;
+});
+
+// ====== AUTO ON/OFF (REUTILIZA "Traducir a Voz") ======
+btnTranslateVoice.addEventListener('click', ()=>{
+  autoOn = !autoOn;
+  subtitles.textContent = autoOn ? '✅ Auto ACTIVADO (letras + señas)' : '⏸️ Auto DESACTIVADO';
+});
+
+// ====== ESPACIO / BORRAR ======
+btnSpace?.addEventListener('click', ()=>{ textBuffer += ' '; subtitles.textContent = `🧠 ${textBuffer}`; });
+btnBack ?.addEventListener('click', ()=>{ textBuffer = textBuffer.slice(0,-1); subtitles.textContent = `🧠 ${textBuffer}`; });
+
+// Atajos de teclado
+document.addEventListener('keydown', (e)=>{
+  if (e.key === 'Backspace'){ e.preventDefault(); textBuffer = textBuffer.slice(0,-1); subtitles.textContent = `🧠 ${textBuffer}`; }
+  if (e.key === ' '){ e.preventDefault(); textBuffer += ' '; subtitles.textContent = `🧠 ${textBuffer}`; }
+});
+
+// ====== TIPS ======
+// - Para “mejor y más rápido”: buena luz, mano completa en cuadro, 10–30 ejemplos por letra variando ángulo/distancia.
+// - Ajustes finos: sube CONF_MIN a 0.75–0.8 si hay falsos positivos; o baja WIN/NEED (p.ej. 8/5) si quieres aún más rapidez.
+</script>
+
+
+</body>
+</html>

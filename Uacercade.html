@@ -1,0 +1,615 @@
+
+
+<!DOCTYPE html>
+<html lang="es">
+ 
+
+<head>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Interfaz: Cámara + Traducción + Voz</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="color-scheme" content="light dark" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #0D0D0D; --card:#3F094F; --muted:#F2F2F2; --accent1:#D923DB; --accent2:#80277B; }
+    html { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+    .message-box { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 1rem; padding: 1rem; margin-top: 0.5rem; font-size: 2rem; text-align: center; font-weight: bold; }
+    .subtitle-box { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); border-radius: 0.5rem; padding: 0.5rem 1rem; margin-top: 0.5rem; font-size: 1.25rem; text-align: center; font-weight: bold; color: #F2F2F2; }
+  </style>
+  <header class="bg-[var(--card)] shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-5 flex justify-between items-center">
+      <h1 class="text-2xl font-extrabold">✋ Aprende Lengua de Señas</h1>
+      <nav>
+        <a href="Interfaz_principal.html" class="px-4 py-2 rounded-lg bg-[var(--accent1)] hover:bg-[var(--accent2)] font-semibold text-white">Inicio</a>
+      </nav>
+    </div>
+  </header>
+
+</head>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+<body class="min-h-screen bg-[var(--bg)] text-[var(--muted)]">
+  <header class="max-w-6xl mx-auto px-4 py-6 flex items-center justify-between">
+    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Cámara + Traducción + Voz</h1>
+    <div class="text-xs sm:text-sm text-[var(--muted)]">Demo HTML/JS (sin backend)</div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 pb-20">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- CAMARA -->
+      <section class="bg-[var(--card)]/60 rounded-2xl p-4 sm:p-6 shadow-xl ring-1 ring-white/5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">Cámara</h2>
+          <span class="text-xs text-[var(--muted)]" id="camStatus">inactiva</span>
+        </div>
+
+        <div class="space-y-4">
+          <div class="aspect-video w-full overflow-hidden rounded-xl ring-1 ring-white/10">
+            <video id="video" class="w-full h-full object-cover bg-slate-800" playsinline></video>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button id="btnStartCam" class="px-3 py-2 rounded-xl bg-[var(--accent1)] hover:bg-[var(--accent2)] transition font-medium">Iniciar</button>
+            <button id="btnStopCam" class="px-3 py-2 rounded-xl bg-[var(--card)] hover:bg-[#5a0b5a] transition font-medium">Detener</button>
+            <button id="btnTranslateText" class="px-3 py-2 rounded-xl bg-[var(--accent2)] hover:bg-[var(--accent1)] transition font-medium">Traducir a Texto</button>
+            <button id="btnTranslateVoice" class="px-3 py-2 rounded-xl bg-[var(--accent2)] hover:bg-[var(--accent1)] transition font-medium">Traducir a Voz</button>
+          </div>
+<canvas id="canvas" width="640" height="480" 
+        class="w-full rounded-xl ring-1 ring-white/10"></canvas>
+
+          
+          <figure id="previewWrap" class="hidden">
+            <figcaption class="text-sm text-[var(--muted)] mb-2">Captura</figcaption>
+            <img id="preview" alt="Captura" class="rounded-xl ring-1 ring-white/10 max-h-72 object-contain" />
+            <div class="mt-2 flex gap-2">
+              <a id="downloadShot" download="captura.png" class="text-sm underline decoration-[#80277B] hover:decoration-[#D923DB]">Descargar</a>
+              <button id="clearShot" class="text-sm text-[var(--muted)] hover:text-white">Limpiar</button>
+            </div>
+          </figure>
+          <p class="text-xs text-[var(--muted)]">Permisos: tu navegador pedirá acceso a la cámara. Usa HTTPS o localhost para evitar bloqueos.</p>
+
+          <!-- Contenedor de subtítulos -->
+          <div id="subtitles" class="subtitle-box">Aquí aparecerán los subtítulos de las señas</div>
+        </div>
+      </section>
+
+      <!-- ENVIAR TEXTO -->
+      <section class="bg-[var(--card)]/60 rounded-2xl p-4 sm:p-6 shadow-xl ring-1 ring-white/5">
+        <div class="space-y-6">
+          <h3 class="font-semibold mb-2">Enviar texto</h3>
+          <div class="flex gap-2">
+            <input id="sendInput" type="text" class="flex-1 bg-[#0D0D0D] rounded-xl p-3 ring-1 ring-white/10" placeholder="Escribe un mensaje…" />
+            <button id="btnSend" class="px-4 py-2 rounded-xl bg-[var(--accent1)] hover:bg-[var(--accent2)] transition font-semibold">Enviar</button>
+          </div>
+          <div id="messageContainer"></div>
+          <!-- Imagen de ejemplo -->
+          <div class="mt-4">
+            <img src="c:\Users\MINEDUCYT\Downloads\WhatsApp Image 2025-08-30 at 9.38.03 AM (1).jpeg" alt="Ejemplo" class="w-full rounded-xl shadow-lg" />
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="max-w-6xl mx-auto px-4 pb-10 text-center text-xs text-[var(--muted)]">
+    Hecho  por el equipo de SingToSpeech.
+  </footer>
+ 
+<script>
+// ====== SELECTORES EXISTENTES ======
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const subtitles = document.getElementById('subtitles');
+const camStatus = document.getElementById('camStatus');
+
+const video = document.getElementById('video');
+const btnStartCam = document.getElementById('btnStartCam');
+const btnStopCam  = document.getElementById('btnStopCam');
+const btnTranslateText  = document.getElementById('btnTranslateText');   // reusado: Añadir ejemplo (letra)
+const btnTranslateVoice = document.getElementById('btnTranslateVoice');  // reusado: Auto ON/OFF
+
+// ====== BOTONES AUX (ESPACIO / BORRAR) -> se crean si no existen ======
+(function ensureAuxButtons(){
+  const grid = document.querySelector('.grid.grid-cols-2.sm\\:grid-cols-4.gap-2');
+  if (!grid) return;
+  if (!document.getElementById('btnSpace')) {
+    const b = document.createElement('button');
+    b.id='btnSpace';
+    b.className='px-3 py-2 rounded-xl bg-[var(--card)] hover:bg-[#5a0b5a] transition font-medium';
+    b.textContent='Espacio';
+    grid.appendChild(b);
+  }
+  if (!document.getElementById('btnBack')) {
+    const b = document.createElement('button');
+    b.id='btnBack';
+    b.className='px-3 py-2 rounded-xl bg-[var(--card)] hover:bg-[#5a0b5a] transition font-medium';
+    b.textContent='Borrar';
+    grid.appendChild(b);
+  }
+})();
+
+const btnSpace = document.getElementById('btnSpace');
+const btnBack  = document.getElementById('btnBack');
+
+// ====== MEDIAPIPE HANDS ======
+const hands = new Hands({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+hands.setOptions({
+  maxNumHands: 2,          // 👈 ahora detecta dos manos
+  modelComplexity: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7
+});
+
+
+// ====== DATASET (KNN) PARA LETRAS LESA ======
+/** dataset = { "A":[Float32Array,...], "B":[...], ... } */
+const dataset = Object.create(null);
+
+// Persistencia
+function saveDataset(){
+  const packed = {};
+  for (const [k, arr] of Object.entries(dataset)) packed[k] = arr.map(v => Array.from(v));
+  try { localStorage.setItem('lessa-dataset', JSON.stringify(packed)); } catch {}
+}
+function loadDataset(){
+  try {
+    const raw = localStorage.getItem('lessa-dataset'); if (!raw) return;
+    const packed = JSON.parse(raw);
+    for (const [k, arr] of Object.entries(packed)) dataset[k] = arr.map(a => Float32Array.from(a));
+  } catch {}
+}
+loadDataset();
+
+/* ========== HELPERS GEOM ==========
+   Indices útiles: 0=wrist, MCPs 5(index),9(middle),13(ring),17(pinky), tip 4/8/12/16/20
+*/
+function vsub(a,b){ return {x:a.x-b.x, y:a.y-b.y, z:(a.z||0)-(b.z||0)}; }
+function vlen(a){ return Math.hypot(a.x, a.y, a.z||0); }
+function dist(a,b){ return vlen(vsub(a,b)); }
+
+/* Rotación 2D (x,y) */
+function rotXY(p, cosT, sinT){
+  return { x: p.x*cosT - p.y*sinT, y: p.x*sinT + p.y*cosT, z: p.z||0 };
+}
+
+/* Normaliza landmarks:
+   - Flip lateral si mano izquierda (x = -x)
+   - Traslada a origen en la muñeca
+   - Escala por tamaño de palma (media dist a MCPs 5,9,13,17)
+   - Rota para alinear vector muñeca->MCP medio (0->9) con eje Y+
+*/
+function normalizeLandmarks(landmarks, handed='Right'){
+  // 1) copiar
+  const lm = landmarks.map(p => ({x:p.x, y:p.y, z:p.z||0}));
+  // 2) flip si Left (evita que “L” y “R” parezcan diferentes)
+  if (handed === 'Left') {
+    for (const p of lm) p.x = -p.x;
+  }
+  // 3) origen en muñeca
+  const wrist = { ...lm[0] };
+  for (const p of lm){
+    p.x -= wrist.x; p.y -= wrist.y; p.z -= wrist.z;
+  }
+  // 4) escala por tamaño de palma (media distancia a MCPs)
+  const mcpIdx = [5,9,13,17];
+  let acc = 0;
+  for (const i of mcpIdx) acc += vlen(lm[i]);
+  const scale = (acc / mcpIdx.length) || 1e-6;
+  for (const p of lm){ p.x/=scale; p.y/=scale; p.z/=scale; }
+
+  // 5) rotación: alinear 0->9 (muñeca->MCP medio) con eje Y+
+  const axis = { x: lm[9].x, y: lm[9].y };
+  const th = Math.atan2(axis.y, axis.x) - Math.PI/2; // queremos apuntar en +Y
+  const cosT = Math.cos(th), sinT = Math.sin(th);
+  for (let i=0; i<lm.length; i++){
+    const r = rotXY(lm[i], cosT, sinT);
+    lm[i].x = r.x; lm[i].y = r.y; lm[i].z = r.z;
+  }
+  return lm;
+}
+
+/* Curvatura por dedo: tip vs pip respecto a mcp */
+function fingerCurl(lm, tip, pip, mcp){
+  const d_tip = dist(lm[tip], lm[mcp]);
+  const d_pip = dist(lm[pip], lm[mcp]);
+  // mayor d_pip que d_tip ≈ dedo curvado hacia palma
+  return (d_pip - d_tip); // >0 => curvado, <0 => extendido
+}
+
+/* ===== FEATURES ROBUSTAS =====
+   Vector = [posiciones (21*2 xy) + z resumida (21*1 opcional) +
+             distancias clave + curvaturas]  -> Float32Array
+*/
+function extractFeatures(landmarks, handed='Right'){
+  const lm = normalizeLandmarks(landmarks, handed);
+
+  const out = [];
+
+  // 1) posiciones (x,y) de 21 puntos
+  for (let i=0;i<21;i++){ out.push(lm[i].x, lm[i].y); }
+
+  // 2) distancias “ancla”: wrist a tips y a MCPs
+  const tips = [4,8,12,16,20];
+  const mcps = [5,9,13,17];
+  for (const t of tips) out.push( dist(lm[0], lm[t]) );
+  for (const m of mcps) out.push( dist(lm[0], lm[m]) );
+
+  // 3) relaciones entre dedos: tip–tip distancias (4 pares)
+  out.push( dist(lm[8],lm[12]), dist(lm[12],lm[16]), dist(lm[16],lm[20]), dist(lm[8],lm[20]) );
+
+  // 4) curvaturas (tip vs pip): índice(8/6/5), medio(12/10/9), anular(16/14/13), meñique(20/18/17), pulgar(4/3/2)
+  out.push(
+    fingerCurl(lm,8,6,5),
+    fingerCurl(lm,12,10,9),
+    fingerCurl(lm,16,14,13),
+    fingerCurl(lm,20,18,17),
+    fingerCurl(lm,4,3,2)
+  );
+
+  return Float32Array.from(out);
+}
+
+/* ====== KNN HÍBRIDO ======
+   - k dinámico = clamp(round(sqrt(N)), 3..7)
+   - voto 1/(d+eps)
+   - booster por centroides por clase (si clase tiene >=5 muestras)
+*/
+function l2(a,b){ let s=0; for (let i=0;i<a.length;i++){ const d=a[i]-b[i]; s+=d*d; } return Math.sqrt(s); }
+
+const _centroids = {}; // cache {label: Float32Array}
+
+function recomputeCentroids(dataset){
+  for (const [lab, arr] of Object.entries(dataset)){
+    if (!arr.length) { delete _centroids[lab]; continue; }
+    const dim = arr[0].length;
+    const c = new Float32Array(dim);
+    for (const v of arr) for (let i=0;i<dim;i++) c[i]+=v[i];
+    for (let i=0;i<dim;i++) c[i]/=arr.length;
+    _centroids[lab] = c;
+  }
+}
+
+function predictKNN(feat, kOverride){
+  const entries = [];
+  let totalSamples = 0;
+  for (const arr of Object.values(dataset)) totalSamples += arr.length;
+  if (!totalSamples) return { label:null, conf:0 };
+
+  const k = Math.max(3, Math.min(7, kOverride ?? Math.round(Math.sqrt(totalSamples)) ));
+
+  // vecinos
+  for (const [lab, arr] of Object.entries(dataset)){
+    for (const v of arr){
+      const d = l2(feat, v);
+      entries.push({lab, d});
+    }
+  }
+  entries.sort((a,b)=>a.d-b.d);
+  const top = entries.slice(0, Math.min(k, entries.length));
+
+  const votes = {};
+  let sum = 0, bestLab=null, bestScore=-1;
+  for (const n of top){
+    const w = 1/(n.d + 1e-6);
+    votes[n.lab] = (votes[n.lab]||0) + w;
+    sum += w;
+    if (votes[n.lab] > bestScore){ bestScore = votes[n.lab]; bestLab = n.lab; }
+  }
+
+  // booster por centroides (suaviza ruido y clases grandes)
+  if (Object.keys(_centroids).length === 0) recomputeCentroids(dataset);
+  let boostLab = null, boostScore = -1;
+  for (const [lab, c] of Object.entries(_centroids)){
+    const d = l2(feat, c);
+    const w = 1/(d + 1e-6);
+    if (w > boostScore){ boostScore = w; boostLab = lab; }
+  }
+  // mezcla ligera: 80% knn + 20% centroid
+  if (boostLab){
+    votes[boostLab] = (votes[boostLab]||0) + 0.2*boostScore;
+    // recompute best
+    bestLab = null; bestScore = -1; sum = 0;
+    for (const v of Object.values(votes)) sum += v;
+    for (const [lab, v] of Object.entries(votes)){
+      if (v > bestScore){ bestScore = v; bestLab = lab; }
+    }
+  }
+
+  const conf = bestScore/(sum||1);
+  return { label: bestLab, conf };
+}
+
+/* ====== REGLAS RÁPIDAS (ahora sobre coords normalizadas) ====== */
+function isExtended(lm, tip, pip){ return lm[tip].y < lm[pip].y; }
+function isCurled(lm, tip, pip){ return lm[tip].y > lm[pip].y; }
+function thumbExtended(lm){
+  // en coords normalizadas y rotadas, pulgar extendido ≈ |x_tip| grande y y_tip por encima de base
+  return (Math.abs(lm[4].x) > 0.25) && (lm[4].y < lm[3].y);
+}
+function touch(a,b){ return dist(a,b) < 0.35; } // umbral ya en espacio normalizado
+// Puntero bonito para landmarks
+function drawPointer(ctx, p, color = '#00E5FF') {
+  const rOuter = 14, rInner = 6;
+
+  // Glow
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, rOuter, 0, Math.PI*2);
+  ctx.fillStyle = color + '33'; // 20% alpha
+  ctx.fill();
+
+  // Borde
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = color;
+  ctx.stroke();
+
+  // Núcleo
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, rInner, 0, Math.PI*2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.restore();
+}
+
+// Convierte coords normalizadas (0..1) de MediaPipe a píxeles del canvas
+function toCanvasXY(pt, w, h){
+  return { x: pt.x * w, y: pt.y * h };
+}
+
+function classifyRuleBased(rawLm, handed='Right'){
+  const lm = normalizeLandmarks(rawLm, handed);
+  const ext = {
+    i: isExtended(lm,8,6),
+    m: isExtended(lm,12,10),
+    r: isExtended(lm,16,14),
+    p: isExtended(lm,20,18),
+  };
+  const cur = {
+    i: isCurled(lm,8,6),
+    m: isCurled(lm,12,10),
+    r: isCurled(lm,16,14),
+    p: isCurled(lm,20,18),
+  };
+  const tExt = thumbExtended(lm);
+
+  // A (puño)
+  if (cur.i && cur.m && cur.r && cur.p && !tExt) return {label:'A', conf:0.95};
+  // B (abierta)
+  if (ext.i && ext.m && ext.r && ext.p) return {label:'B', conf:0.90};
+  // L
+  if (ext.i && tExt && cur.m && cur.r && cur.p) return {label:'L', conf:0.90};
+  // Y
+  if (tExt && ext.p && cur.i && cur.m && cur.r) return {label:'Y', conf:0.90};
+  // F/OK (pulgar-índice tocándose)
+  if (touch(lm[4], lm[8])) return {label:'F', conf:0.92};
+  // D
+  if (ext.i && cur.m && cur.r && cur.p && !tExt) return {label:'D', conf:0.85};
+  // G (índice y pulgar casi alineados en y)
+  if (ext.i && tExt && cur.m && cur.r && cur.p && Math.abs(lm[4].y - lm[8].y) < 0.12) return {label:'G', conf:0.85};
+  // THUMBS_UP
+  if (tExt && cur.i && cur.m && cur.r && cur.p && lm[4].y < lm[2].y) return {label:'THUMBS_UP', conf:0.9};
+  // PEACE
+  if (ext.i && ext.m && cur.r && cur.p) return {label:'PEACE', conf:0.9};
+  // ILY
+  if (tExt && ext.i && ext.p && cur.m && cur.r) return {label:'ILY', conf:0.9};
+
+  return {label:null, conf:0};
+}
+
+
+
+// Traducción para señas por reglas (palabras)
+const SIGN_TRANSLATE = {
+  'THUMBS_UP':'¡Bien!',
+  'PEACE':'Paz',
+  'ILY':'Te quiero',
+  'F':'OK'
+};
+
+// ====== SUAVIZADO Y CONTROL ======
+const WIN=10, NEED=7, CONF_MIN=0.75;   // agresivo = responde más rápido
+let predWin=[];                        // [{label, conf, type:'rule'|'knn'}]
+let autoOn=false;                      // Reconocimiento automático (toggle)
+let textBuffer='';                     // acumulador (letras/palabras)
+
+// ====== VOZ LENTA ======
+const synth = window.speechSynthesis;
+let lastSpoken='', lastAt=0;
+const COOLDOWN=1200;
+function speakSlow(text){
+  const now = performance.now();
+  if (text===lastSpoken && (now-lastAt)<COOLDOWN) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'es-ES';
+  u.rate = 0.75;   // MÁS LENTO
+  u.pitch = 1.0;
+  synth.speak(u);
+  lastSpoken=text; lastAt=now;
+}
+
+// ====== PIPELINE DE RESULTADOS ======
+let lastLandmarks=null, lastHanded='Right';
+hands.onResults((results)=>{
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  ctx.save();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(results.image, 0,0, canvas.width, canvas.height);
+
+  const handsLM = results.multiHandLandmarks || [];
+  const handsHD = results.multiHandedness   || []; // misma indexación que landmarks
+
+  if (handsLM.length){
+    // === DIBUJO DE CADA MANO (esqueleto + punteros) ===
+    for (let i=0; i<handsLM.length; i++){
+      const lm = handsLM[i];
+      const handed = (handsHD[i] && handsHD[i].label) ? handsHD[i].label : 'Right';
+
+      // Colores por mano
+      const color = handed === 'Left' ? '#FF7A00' : '#3DDC97';
+
+      // Esqueleto
+      drawConnectors(ctx, lm, HAND_CONNECTIONS, { color, lineWidth: 3 });
+      drawLandmarks(ctx, lm, { color: '#FFFFFF', lineWidth: 2 });
+
+      // Punteros: índice(8) y pulgar(4)
+      const pIndex = toCanvasXY(lm[8], canvas.width, canvas.height);
+      const pThumb = toCanvasXY(lm[4], canvas.width, canvas.height);
+      drawPointer(ctx, pIndex, color);
+      drawPointer(ctx, pThumb, color);
+
+      // Línea entre pulgar e índice (útil para OK/pellizco)
+      ctx.beginPath();
+      ctx.moveTo(pThumb.x, pThumb.y);
+      ctx.lineTo(pIndex.x, pIndex.y);
+      ctx.strokeStyle = color + 'AA';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Etiqueta “L/R” sobre la muñeca
+      const pWrist = toCanvasXY(lm[0], canvas.width, canvas.height);
+      ctx.font = '12px Inter, system-ui';
+      ctx.fillStyle = color;
+      ctx.fillText(handed, pWrist.x + 8, pWrist.y - 8);
+    }
+
+    // === LÓGICA DE RECONOCIMIENTO (toma la primera mano como referencia) ===
+    const lm0 = handsLM[0];
+    lastLandmarks = lm0;
+    if (handsHD[0]?.label) lastHanded = handsHD[0].label;
+
+    if (autoOn){
+      // 1) Reglas rápidas
+      const rule = classifyRuleBased(lm0, lastHanded);
+      if (rule.label) predWin.push({label:rule.label, conf:rule.conf, type:'rule'});
+
+      // 2) Letras KNN (si hay dataset)
+      if (Object.keys(dataset).length){
+       const feat = extractFeatures(lastLandmarks, lastHanded); // 👈 importante
+dataset[label] = dataset[label] || [];
+dataset[label].push(feat);
+saveDataset();
+recomputeCentroids(dataset); // recalcula centroides tras guardar
+
+      }
+
+      if (predWin.length > WIN) predWin.shift();
+
+      // voto estable
+      const tally={};
+      for (const p of predWin){
+        if (!p.label || p.conf < CONF_MIN) continue;
+        const key = p.label + '|' + p.type;
+        tally[key] = (tally[key]||0) + 1;
+      }
+      let bestKey=null, bestCnt=0;
+      for (const [k,n] of Object.entries(tally)){ if (n>bestCnt){ bestCnt=n; bestKey=k; } }
+      let stable=null, source='knn';
+      if (bestKey && bestCnt >= NEED){
+        const [lab,t] = bestKey.split('|');
+        stable = lab; source = t;
+      }
+
+      if (stable){
+        const out = (source==='rule' ? (SIGN_TRANSLATE[stable] || stable) : stable);
+        if (source==='rule' && SIGN_TRANSLATE[stable]){
+          if (textBuffer && !textBuffer.endsWith(' ')) textBuffer+=' ';
+          textBuffer += SIGN_TRANSLATE[stable] + ' ';
+        } else {
+          textBuffer += out;
+        }
+        subtitles.textContent = `🧠 ${textBuffer}`;
+        speakSlow(out);
+        predWin.length = 0;
+      } else {
+        if (rule?.label) subtitles.textContent = `Seña: ${rule.label} ${(rule.conf*100|0)}%`;
+        else subtitles.textContent = '👋 Mano detectada';
+      }
+    } else {
+      subtitles.textContent = '👋 Mano detectada';
+    }
+
+    camStatus.textContent = "activa";
+  } else {
+    lastLandmarks = null;
+    predWin.length = 0;
+    subtitles.textContent = "❌ No se detecta mano";
+    camStatus.textContent = "inactiva";
+  }
+
+  ctx.restore();
+});
+
+
+
+
+// ====== CONTROL DE CAMARA ======
+let cam = null;
+btnStartCam.onclick = async () => {
+  if (!cam) {
+    cam = new Camera(video, {
+      onFrame: async () => {
+        await hands.send({ image: video });
+      },
+      width: 640,
+      height: 480
+    });
+  }
+  cam.start();
+  camStatus.textContent = "activando…";
+};
+
+btnStopCam.onclick = () => {
+  if (cam) cam.stop();
+  camStatus.textContent = "inactiva";
+};
+
+// ====== BOTONES DE TRADUCCIÓN ======
+btnTranslateText.onclick = () => {
+  autoOn = true;
+  subtitles.textContent = "✍ Traducción automática a texto activada";
+};
+
+btnTranslateVoice.onclick = () => {
+  autoOn = !autoOn;
+  subtitles.textContent = autoOn
+    ? "🎤 Traducción a voz activada"
+    : "🛑 Traducción detenida";
+};
+
+// ====== BOTONES AUX (Espacio/Borrar) ======
+btnSpace.onclick = () => {
+  textBuffer += " ";
+  subtitles.textContent = `🧠 ${textBuffer}`;
+};
+btnBack.onclick = () => {
+  textBuffer = textBuffer.slice(0, -1);
+  subtitles.textContent = `🧠 ${textBuffer}`;
+};
+
+// ====== BOTÓN ENVIAR TEXTO ======
+const sendInput = document.getElementById('sendInput');
+const btnSend = document.getElementById('btnSend');
+const messageContainer = document.getElementById('messageContainer');
+
+btnSend.onclick = () => {
+  const msg = sendInput.value.trim();
+  if (!msg) return;
+  const div = document.createElement('div');
+  div.className = "message-box";
+  div.textContent = msg;
+  messageContainer.appendChild(div);
+  sendInput.value = "";
+};
+</script>
+</body>
+</html>
